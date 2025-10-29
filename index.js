@@ -1,6 +1,6 @@
 // === Constants ===
 const BASE = "https://fsa-crud-2aa9294fe819.herokuapp.com/api";
-const COHORT = ""; // Make sure to change this!
+const COHORT = "/2509-FTB-CT-WEB-PT"; // Make sure to change this!
 const API = BASE + COHORT;
 
 // === State ===
@@ -57,6 +57,41 @@ async function getGuests() {
   }
 }
 
+/** Creates a new party via the API (POST) */
+async function addParty(party) {
+  try {
+    const response = await fetch(API + "/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(party),
+    });
+    if (!response.ok) {
+      throw new Error("POST /events failed: " + response.status);
+    }
+    await getParties(); // refresh list from the source of truth
+    render();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/** Deletes the party with the given ID via the API (DELETE) */
+async function removeParty(id) {
+  try {
+    const response = await fetch(API + "/events/" + id, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("DELETE /events/" + id + " failed: " + response.status);
+    }
+    selectedParty = undefined; // details panel should clear
+    await getParties(); // refresh list after delete
+    render();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 // === Components ===
 
 /** Party name that shows more details about the party when clicked */
@@ -105,6 +140,15 @@ function SelectedParty() {
   `;
   $party.querySelector("GuestList").replaceWith(GuestList());
 
+  const $deleteBtn = document.createElement("button");
+  $deleteBtn.textContent = "Delete party";
+  $deleteBtn.addEventListener("click", async function () {
+    if (selectedParty && selectedParty.id) {
+      await removeParty(selectedParty.id);
+    }
+  });
+  $party.appendChild($deleteBtn);
+
   return $party;
 }
 
@@ -128,6 +172,53 @@ function GuestList() {
   return $ul;
 }
 
+/** Form for adding a new party (name, description, date, location) */
+function NewPartyForm() {
+  const $form = document.createElement("form");
+  $form.innerHTML = `
+    <label>
+      Name
+      <input name="name" required />
+    </label>
+    <label>
+      Description
+      <input name="description" required />
+    </label>
+    <label>
+      Date
+      <input name="date" type="date" required />
+    </label>
+    <label>
+      Location
+      <input name="location" required />
+    </label>
+    <button>Add party</button>
+  `;
+
+  $form.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    const name = $form.name.value.trim();
+    const description = $form.description.value.trim();
+    const dateInput = $form.date.value.trim();
+    const location = $form.location.value.trim();
+
+    const isoDate = new Date(dateInput).toISOString();
+
+    const newParty = {
+      name: name,
+      description: description,
+      date: isoDate,
+      location: location,
+    };
+
+    await addParty(newParty);
+    $form.reset();
+  });
+
+  return $form;
+}
+
 // === Render ===
 function render() {
   const $app = document.querySelector("#app");
@@ -147,6 +238,12 @@ function render() {
 
   $app.querySelector("PartyList").replaceWith(PartyList());
   $app.querySelector("SelectedParty").replaceWith(SelectedParty());
+
+  const $left = $app.querySelector("main > section:first-of-type");
+  const $h3 = document.createElement("h3");
+  $h3.textContent = "Add a new party";
+  $left.appendChild($h3);
+  $left.appendChild(NewPartyForm());
 }
 
 async function init() {
